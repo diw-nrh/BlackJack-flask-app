@@ -1,0 +1,14 @@
+{% import "components/forms/text_input.html" as text_input %}
+{% import "components/forms/date_picker.html" as date_picker %}
+
+{% macro render_text_input(form) %}
+{{ text_input.text_input(form, **kwargs) }}
+{% endmacro %}
+
+{% macro render_date_input(form) %}
+{{ date_picker.date_picker(form, **kwargs) }}
+{% endmacro %}
+
+{% macro redner_date_range_input(start_form, end_form) %}
+{{ date_picker.date_range_picker(start_form, end_form, **kwargs) }}
+{% endmacro %}

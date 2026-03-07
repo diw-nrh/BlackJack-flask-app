@@ -1,0 +1,148 @@
+{% extends "base/base.html" %}
+{% block title %}{{ room_code }} — ผู้เล่น{% endblock %}
+
+{% block body %}
+<div class="game game--player" id="game-app" data-room="{{ room_code }}" data-token="{{ token }}" data-role="player"
+    data-nickname="{{ viewer_nickname }}">
+
+    <!-- ===== HEADER ===== -->
+    <header class="game-header">
+        <div class="game-header__left">
+            <span class="game-header__badge badge--player">👤 ผู้เล่น</span>
+            <span class="game-header__name">{{ viewer_nickname }}</span>
+        </div>
+        <div class="game-header__center">
+            <span class="room-code-display">🃏 ห้อง <strong>{{ room_code }}</strong></span>
+            <span class="round-info" id="round-info">
+                {% if round %}รอบที่ {{ round.round_number }}{% else %}รอรอบใหม่...{% endif %}
+            </span>
+        </div>
+        <div class="game-header__right">
+            <div class="connection-dot" id="conn-dot" title="WebSocket status"></div>
+        </div>
+    </header>
+
+    <div class="game-body">
+
+        <!-- ===== LEFT: TABLE VIEW ===== -->
+        <div class="game-panel game-panel--table">
+            <h2 class="panel-title">🎯 โต๊ะเกม</h2>
+
+            <!-- Dealer hand -->
+            <div class="dealer-section">
+                <div class="participant-label">🎰 กองกลาง (เจ้ามือ)</div>
+                <div class="hand-display" id="dealer-hand">
+                    {% if dealer_hand and dealer_hand.cards %}
+                    <div class="hand-score">{{ dealer_hand.score }} คะแนน
+                        {% if dealer_hand.is_busted %}<span class="badge badge--bust">BUST</span>{% endif %}
+                        {% if dealer_hand.is_blackjack %}<span class="badge badge--bj">BJ!</span>{% endif %}
+                    </div>
+                    <div class="cards-row">
+                        {% for card in dealer_hand.cards %}
+                        <div
+                            class="playing-card playing-card--{{ 'red' if card.suit in ['hearts','diamonds'] else 'black' }}">
+                            <span class="card-rank">{{ card.rank }}</span>
+                            <span class="card-suit">{{ {'spades':'♠','hearts':'♥','diamonds':'♦','clubs':'♣'}[card.suit]
+                                }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="hand-empty">ยังไม่มีไพ่</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Players hands -->
+            <div class="players-section">
+                {% for p in players %}
+                <div class="participant" id="player-{{ loop.index }}"
+                    data-token="{{ p.hand.player_token if p.hand else '' }}">
+                    <div class="participant-label">
+                        {{ '👤' if p.role == 'player' else '🎯' }} {{ p.nickname }}
+                        {% if p.is_self %}<span class="badge badge--you">คุณ</span>{% endif %}
+                        {% if p.role == 'teacher' %}<span class="badge badge--teacher">อาจารย์</span>{% endif %}
+                    </div>
+                    {% if p.hand %}
+                    <div class="hand-display">
+                        <div class="hand-score">{{ p.hand.score }} คะแนน
+                            {% if p.hand.is_busted %}<span class="badge badge--bust">BUST</span>{% endif %}
+                            {% if p.hand.is_blackjack %}<span class="badge badge--bj">BJ!</span>{% endif %}
+                        </div>
+                        <div class="cards-row">
+                            {% for card in p.hand.cards %}
+                            <div
+                                class="playing-card playing-card--{{ 'red' if card.suit in ['hearts','diamonds'] else 'black' }}">
+                                <span class="card-rank">{{ card.rank }}</span>
+                                <span class="card-suit">{{
+                                    {'spades':'♠','hearts':'♥','diamonds':'♦','clubs':'♣'}[card.suit] }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="hand-empty">ยังไม่กรอกไพ่</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- ===== RIGHT: MY HAND + ADVICE ===== -->
+        <div class="game-panel game-panel--action">
+
+            <!-- Card Input -->
+            <div class="card-input-section">
+                <h3 class="panel-title">✋ ไพ่ในมือของคุณ</h3>
+                <div class="card-selector">
+                    <div class="selector-group">
+                        <label class="selector-label">หน้าไพ่</label>
+                        <div class="rank-grid" id="rank-grid">
+                            {% for rank in ['A','2','3','4','5','6','7','8','9','10','J','Q','K'] %}
+                            <button type="button" class="rank-btn" data-rank="{{ rank }}">{{ rank }}</button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="selector-group">
+                        <label class="selector-label">ดอกไพ่</label>
+                        <div class="suit-grid" id="suit-grid">
+                            <button type="button" class="suit-btn suit-btn--black" data-suit="spades">♠</button>
+                            <button type="button" class="suit-btn suit-btn--red" data-suit="hearts">♥</button>
+                            <button type="button" class="suit-btn suit-btn--red" data-suit="diamonds">♦</button>
+                            <button type="button" class="suit-btn suit-btn--black" data-suit="clubs">♣</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="input-actions">
+                    <button id="btn-add-card" class="btn btn--primary" disabled>เพิ่มไพ่</button>
+                    <button id="btn-undo" class="btn btn--ghost">↩ ลบล่าสุด</button>
+                </div>
+            </div>
+
+            <!-- Advice Panel -->
+            <div class="advice-panel" id="advice-panel">
+                <div class="advice-panel__header">
+                    <h3 class="panel-title">🧠 คำแนะนำระบบ</h3>
+                    <button id="btn-advice" class="btn btn--sm btn--outline">วิเคราะห์</button>
+                </div>
+                <div class="advice-panel__body" id="advice-body">
+                    <div class="advice-placeholder">กรอกไพ่แล้วกด "วิเคราะห์"</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script src="{{ 'js/blackjack.js' | static_url }}"></script>
+<script>
+    BlackJack.init({
+        role: 'player',
+        roomCode: '{{ room_code }}',
+        token: '{{ token }}',
+        nickname: '{{ viewer_nickname }}'
+    });
+</script>
+{% endblock %}

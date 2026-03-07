@@ -1,0 +1,4 @@
+#!/bin/sh
+
+cd webapp/web/static
+npm $1 $2

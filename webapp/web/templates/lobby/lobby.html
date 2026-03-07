@@ -1,0 +1,98 @@
+{% extends "base/base.html" %}
+{% block title %}BlackJack — เข้าห้องเล่น{% endblock %}
+
+{% block body %}
+<div class="lobby">
+    <div class="lobby__hero">
+        <div class="lobby__logo">🃏</div>
+        <h1 class="lobby__title">BlackJack Advisor</h1>
+        <p class="lobby__subtitle">ระบบช่วยวิเคราะห์ไพ่แบบ real-time</p>
+    </div>
+
+    <div class="lobby__cards">
+
+        <!-- CREATE ROOM -->
+        <div class="card card--create">
+            <div class="card__badge">ใหม่</div>
+            <h2 class="card__title">🎲 สร้างห้องใหม่</h2>
+            <p class="card__desc">สร้างห้องและรับ room code เพื่อแชร์กับเพื่อน</p>
+            <form method="POST" action="/room/create" class="form">
+                <div class="form__field">
+                    <label class="form__label">ชื่อเล่น</label>
+                    <input type="text" name="nickname" class="form__input" placeholder="กรอกชื่อเล่น" required
+                        maxlength="30">
+                </div>
+                <div class="form__field">
+                    <label class="form__label">บทบาท</label>
+                    <div class="role-toggle">
+                        <label class="role-toggle__option">
+                            <input type="radio" name="role" value="player" checked>
+                            <span class="role-toggle__btn">👤 ผู้เล่น</span>
+                        </label>
+                        <label class="role-toggle__option">
+                            <input type="radio" name="role" value="teacher">
+                            <span class="role-toggle__btn">🎯 อาจารย์</span>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn--primary btn--full">สร้างห้อง →</button>
+            </form>
+        </div>
+
+        <!-- JOIN ROOM -->
+        <div class="card card--join">
+            <h2 class="card__title">🔑 เข้าห้อง</h2>
+            <p class="card__desc">มีรหัสห้องอยู่แล้ว? เข้าร่วมเลย</p>
+            <form method="POST" action="/room/join" class="form">
+                <div class="form__field">
+                    <label class="form__label">ชื่อเล่น</label>
+                    <input type="text" name="nickname" class="form__input" placeholder="กรอกชื่อเล่น" required
+                        maxlength="30">
+                </div>
+                <div class="form__field">
+                    <label class="form__label">รหัสห้อง</label>
+                    <input type="text" name="room_code" class="form__input form__input--code" placeholder="ABC123"
+                        required maxlength="8" style="text-transform: uppercase; letter-spacing: 0.3em;">
+                </div>
+                <div class="form__field">
+                    <label class="form__label">บทบาท</label>
+                    <div class="role-toggle">
+                        <label class="role-toggle__option">
+                            <input type="radio" name="role" value="player" checked>
+                            <span class="role-toggle__btn">👤 ผู้เล่น</span>
+                        </label>
+                        <label class="role-toggle__option">
+                            <input type="radio" name="role" value="teacher">
+                            <span class="role-toggle__btn">🎯 อาจารย์</span>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn--secondary btn--full">เข้าห้อง →</button>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- How it works -->
+    <div class="lobby__how">
+        <h3>วิธีเล่น</h3>
+        <div class="steps">
+            <div class="step"><span class="step__num">1</span><span>อาจารย์สร้างห้องและแชร์รหัสให้ผู้เล่น</span></div>
+            <div class="step"><span class="step__num">2</span><span>ผู้เล่นเข้าห้องด้วยรหัส</span></div>
+            <div class="step"><span class="step__num">3</span><span>อาจารย์กด "เริ่มรอบ" — ทุกคนกรอกไพ่ตัวเอง</span>
+            </div>
+            <div class="step"><span class="step__num">4</span><span>ระบบแนะนำ HIT / STAND / DOUBLE พร้อม % ชนะ</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+    // ทำให้ room code เป็นพิมพ์ใหญ่อัตโนมัติ
+    document.querySelector('input[name="room_code"]')?.addEventListener('input', function () {
+        this.value = this.value.toUpperCase();
+    });
+</script>
+{% endblock %}

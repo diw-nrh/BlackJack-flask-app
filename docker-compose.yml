@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb_blackjack
+    restart: always
+    ports:
+      - "27018:27017" # Map port เพื่อให้เครื่องหลักเข้าถึงได้โดยไม่ชนกับ MongoDB ในเครื่อง
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin # ชื่อผู้ใช้
+      - MONGO_INITDB_ROOT_PASSWORD=password123 # รหัสผ่าน
+    volumes:
+      - mongodb_data:/data/db # เก็บข้อมูลไว้ไม่ให้หายเมื่อปิด Container
+
+volumes:
+  mongodb_data:

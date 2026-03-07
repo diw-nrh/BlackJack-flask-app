@@ -1,0 +1,141 @@
+{% macro date_picker(field, class_="", placeholder="", prefix_icon="", suffix_icon="", disabled=False,
+readonly=False) %}
+{% set style = "input flex items-center gap-2 w-full" %}
+{% if field.errors | count > 0 %}
+{% set style = style + " input-error" %}
+{% endif %}
+{% if class_ != "" %}
+{% set style = style + " " + class_ %}
+{% endif %}
+
+<fieldset class="fieldset w-full" id="field-{{ field.id }}">
+  <legend class="fieldset-legend">
+    {{ field.label.text }}
+    {% if field.flags.required %}
+    <span class="text-error">*</span>
+    {% endif %}
+  </legend>
+
+  <div class="relative w-full">
+    <input type="hidden" id="{{ field.id }}" name="{{ field.name }}" class="w-full cursor-pointer input validator"
+      autocomplete="off" placeholder="{{ field.label.text }}" {% if field.data %}
+      value="{{ field.data|format_date('%Y-%m-%d') if field.data else ''}}" {% endif %} {% if disabled %} disabled {%
+      endif %} {% if readonly %} readonly {% endif %}>
+
+    <button type="button" id="cally-{{ field.id }}" class="{{ style }}{% if readonly %} input-readonly {% endif %}" {%
+      if disabled %} disabled {% endif %}>
+      <div class="flex items-center justify-between w-full">
+        <span id="cally-data-{{ field.id }}">
+          {{ field.placeholder if field.placeholder else 'กรุณาเลือกวันที่' }}
+        </span>
+        <i class="ph ph-size ph-calendar-blank"></i>
+      </div>
+    </button>
+
+    <div id="cally-popover-{{ field.id }}" class="absolute z-50 hidden shadow-lg dropdown bg-base-100 rounded-box" {% if
+      readonly or disabled %} hidden {% endif %}>
+      <calendar-date class="cally" onchange="{
+                const callyData = document.getElementById('cally-data-{{ field.id }}');
+                callyData.innerText = new Date(this.value).toLocaleDateString('en-GB')
+                document.getElementById('{{ field.id }}').value = this.value
+                const valueChangeEvent = new Event('change', { bubbles: true });
+                document.getElementById('cally-popover-{{ field.id }}').classList.add('hidden')
+                callyData.dispatchEvent(valueChangeEvent);
+            }" value="{{ field.data.strftime('%Y-%m-%d') if field.data else ''}}">
+        <i aria-label="Previous" class="ph ph-caret-left" slot="previous"></i>
+        <i aria-label="Next" class="ph ph-caret-right" slot="next"></i>
+        <calendar-month></calendar-month>
+      </calendar-date>
+    </div>
+  </div>
+
+  <p class="validator-hint">
+    {% for error in field.errors %}
+    {% if 'This field is required' in error %}
+    กรุณากรอกข้อมูล
+    {% else %}
+    {{ error }}
+    {% endif %}
+    {% if not loop.last %}<br>{% endif %}
+    {% endfor %}
+  </p>
+</fieldset>
+
+<script>
+  initDatePicker("cally-{{ field.id }}", "cally-popover-{{ field.id }}", "{{ field.id }}", "cally-data-{{ field.id }}");
+</script>
+{% endmacro %}
+
+{% macro date_range_picker(start_field, end_field, class_="", placeholder="", prefix_icon="", suffix_icon="",
+disabled=False,
+readonly=False) %}
+{% set style = "input flex items-center gap-2 w-full" %}
+{% if start_field.errors | count > 0 %}
+{% set style = style + " input-error" %}
+{% endif %}
+{% if class_ != "" %}
+{% set style = style + " " + class_ %}
+{% endif %}
+<fieldset class="fieldset" id="field-{{ start_field.id }}">
+  <legend class="fieldset-legend">
+    {{ start_field.label.text }} - {{ end_field.label.text }}
+    {% if start_field.flags.required %}
+    <span class="text-error">*</span>
+    {% endif %}
+  </legend>
+
+  <div class="relative w-full">
+    <input type="hidden" id="{{ start_field.id }}" name="{{ start_field.name }}" {% if start_field.data %}
+      value="{{ start_field.data|format_date('%Y-%m-%d') }}" {%endif %}>
+    <input type="hidden" id="{{ end_field.id }}" name="{{ end_field.name }}" {% if end_field.data %}
+      value="{{ end_field.data|format_date('%Y-%m-%d') }}" {%endif %}>
+
+    {% set start_date = start_field.data.strftime('%Y-%m-%d') if start_field.data else '' %}
+    {% set end_date = end_field.data.strftime('%Y-%m-%d') if end_field.data else '' %}
+
+    <button type="button" popovertarget="cally-popover-{{ start_field.id }}" id="cally-{{ start_field.id }}"
+      class="{{ style }}" {% if disabled %} disabled {% endif %}>
+      <div class="flex items-center justify-between w-full">
+        <span id="cally-data-{{ start_field.id }}">
+          {{ start_field.placeholder if start_field.placeholder else 'กรุณาเลือกวันที่' }}
+        </span>
+        <i class="ph ph-size ph-calendar-dots"></i>
+      </div>
+    </button>
+    <div id="cally-popover-{{ start_field.id }}" class="absolute z-50 hidden shadow-lg dropdown bg-base-100 rounded-box"
+      {% if readonly or disabled %} hidden {% endif %}>
+      <calendar-range months="2" class="cally" onchange="{
+                const [start_date, end_date] = this.value.split('/');
+                const callyData = document.getElementById('cally-data-{{ start_field.id }}');
+                callyData.innerText = `${new Date(start_date).toLocaleDateString('en-GB')} - ${new Date(end_date).toLocaleDateString('en-GB')}`                
+                document.getElementById('{{ start_field.id }}').value = start_date;
+                document.getElementById('{{ end_field.id }}').value = end_date;
+                document.getElementById('cally-popover-{{ start_field.id }}').classList.add('hidden')
+                const valueChangeEvent = new Event('change', { bubbles: true });
+                callyData.dispatchEvent(valueChangeEvent);
+            }" value="{{ start_date }}/{{ end_date }}">
+        <i aria-label="Previous" class="ph ph-caret-left" slot="previous"></i>
+        <i aria-label="Next" class="ph ph-caret-right" slot="next"></i>
+        <div class="flex flex-col lg:flex-row">
+          <calendar-month></calendar-month>
+          <calendar-month offset="1"></calendar-month>
+        </div>
+      </calendar-range>
+    </div>
+    </calendar-range>
+  </div>
+  <p class="validator-hint">
+    {% for error in end_field.errors %}
+    {% if 'This field is required' in error %}
+    กรุณากรอกข้อมูล
+    {% else %}
+    {{ error }}
+    {% endif %}
+    {% if not loop.last %}<br>{% endif %}
+    {% endfor %}
+  </p>
+</fieldset>
+<script>
+  initDateRange("cally-{{ start_field.id }}", "cally-popover-{{ start_field.id }}", "{{ start_field.id }}", "{{ end_field.id }}", "cally-data-{{ start_field.id }}");
+</script>
+{% endmacro %}

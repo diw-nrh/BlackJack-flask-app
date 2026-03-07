@@ -1,0 +1,37 @@
+[tool.poetry]
+name = "webapp"
+version = "0.1.0"
+description = ""
+authors = ["jakee <jakee.indapanya@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.12,<4.0"
+flask = "^3.1.2"
+flask-mongoengine-3 = "^1.1.0"
+flask-login = "^0.6.3"
+flask-bcrypt = "^1.0.1"
+flask-wtf = "^1.2.2"
+dotenv = "^0.9.9"
+flask-htmx = "^0.4.0"
+flask-socketio = "^5.5.1"
+eventlet = "^0.40.0"
+jinja2-fragments = "^1.9.0"
+livereload = "^2.7.1"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.11.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+run-web = "webapp.cmd.web:main"
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "N", "UP", "SIM", "PERF"]
+
+[tool.ruff.format]
+quote-style = "double"

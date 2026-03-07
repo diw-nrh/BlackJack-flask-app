@@ -1,0 +1,9 @@
+{% extends "base/default_page.html" %}
+
+{% block content %}
+<h1>Welcome to Flask Starter</h1>
+<p>This is the index page.</p>
+<a class="btn btn-primary" href="{{ url_for('users.login') }}">
+  Login
+</a>
+{% endblock %}

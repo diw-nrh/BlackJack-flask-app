@@ -1,0 +1,62 @@
+{% macro text_input(
+  field,
+  id="",
+  class_="",
+  placeholder="",
+  prefix="",
+  suffix="",
+  disabled=False,
+  readonly=False,
+  required=False,
+  disabled_optional_text=True
+  ) %}
+  
+  {#% set style = "input input-bordered flex items-center gap-2 w-full" %#}
+  {% set style = "input flex items-center gap-2 w-full" %}
+  
+  {% if field.errors | count > 0 %}
+  {% set style = style + " input-error" %}
+  {% endif %}
+  
+  {% if readonly or disabled %}
+  {% endif %}
+  
+  {% if class_ != "" %}
+  {% set style = style + " " + class_ %}
+  {% endif %}
+  
+  {% if field.type == "HiddenField" %}
+  {{ field(**kwargs) }}
+  {% else %}
+  <fieldset class="w-full fieldset" id="field-{{ field.id }}">
+    <legend class="fieldset-legend">
+      {{ field.label.text }}
+      {% if field.flags.required or required %}
+      <span class="text-error">*</span>
+      {% endif %}
+      {% if not field.flags.required and not disabled_optional_text %}
+      <p class="fieldset-label">(ไม่บังคับ)</p>
+      {% endif %}
+    </legend>
+    <label class="w-full input validator {% if readonly %}input-readonly{% endif %}">
+      {% if prefix %}
+      {{ prefix_icon }}
+      {% endif %}
+      {{ field(placeholder=placeholder, readonly=readonly, **kwargs) }}
+      {% if suffix %}
+      {{ suffix_icon }}
+      {% endif %}
+    </label>
+    <p class="validator-hint">
+      {% for error in field.errors %}
+      {% if 'This field is required' in error %}
+      กรุณากรอกข้อมูล
+      {% else %}
+      {{ error }}
+      {% endif %}
+      {% if not loop.last %}<br>{% endif %}
+      {% endfor %}
+    </p>
+  </fieldset>
+  {% endif %}
+  {% endmacro %}
