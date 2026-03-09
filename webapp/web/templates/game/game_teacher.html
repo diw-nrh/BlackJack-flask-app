@@ -15,42 +15,143 @@
             </svg>
             เริ่มรอบใหม่
         </button>
+        <!-- Room code + Gear / Edit Mode Toggle -->
+        <div
+            style="position: fixed; top: 12px; right: 130px; z-index: 50; display: flex; align-items: center; gap: 6px;">
+            <span
+                style="font-size:0.75rem; color:var(--text-secondary); background:rgba(255,255,255,0.08); border:1px solid var(--border); border-radius:12px; padding:4px 10px; letter-spacing:0.1em;">{{
+                room_code }}</span>
+            <button id="btn-edit-mode" title="โหมดแก้ไข"
+                style="background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: var(--text-secondary); border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 1rem;">
+                ⚙️
+            </button>
+        </div>
 
-        <!-- ===== LEFT: MY HAND ===== -->
-        <div class="game-panel game-panel--action">
-            {% set my_hand = players | selectattr('is_self') | first %}
-            <div class="hand-display" id="my-hand" style="margin-bottom: 8px;">
-                {% if my_hand and my_hand.hand %}
-                <div class="hand-score"
-                    style="font-size: 0.95rem; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
-                    <span style="color: var(--amber); font-weight: bold;">✋ ในมือ</span>
-                    <span>⭐ {{ my_hand.hand.score }}</span>
-                    {% if my_hand.hand.is_busted %}<span class="badge badge--bust">💥</span>{% endif %}
-                    {% if my_hand.hand.is_blackjack %}<span class="badge badge--bj">🌟</span>{% endif %}
-                </div>
-                <div class="cards-row">
-                    {% for card in my_hand.hand.cards %}
-                    <div class="playing-card playing-card--{{ 'red' if card.suit in ['hearts','diamonds'] else 'black' }}"
-                        style="width: 32px; height: 46px; padding: 2px;">
-                        <span class="card-rank" style="font-size: 0.85rem;">{{ card.rank }}</span>
-                        <span class="card-suit" style="font-size: 0.85rem;">{{
-                            {'spades':'♠','hearts':'♥','diamonds':'♦','clubs':'♣'}[card.suit]
-                            }}</span>
+        <!-- ===== LEFT: ALL PLAYERS VIEW ===== -->
+        <div class="game-panel game-panel--table">
+            <h3 class="panel-subtitle"
+                style="margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">👤
+                ผู้เล่นทั้งหมด (คลิกเพื่อกรอกไพ่)</h3>
+            <div class="players-section"
+                style="display: flex; flex-direction: column; gap: 12px; height: 100%; overflow-y: auto;">
+                <!-- Dealer as first selectable target -->
+                <div class="participant selectable-target" id="dealer-target" data-is-dealer="true"
+                    data-hand-json='{{ dealer_hand | tojson if dealer_hand else "null" }}'
+                    style="background: rgba(255,215,0,0.07); padding: 8px; border-radius: 6px; border: 2px solid var(--gold); cursor: pointer; transition: all 0.2s;">
+                    <div class="participant-label" style="font-size: 0.85rem; margin-bottom: 4px; color: var(--gold);">
+                        🎰 เจ้ามือ
                     </div>
-                    {% endfor %}
+                    <div class="hand-display" id="dealer-hand" style="gap: 4px;">
+                        {% if dealer_hand and dealer_hand.cards %}
+                        <div class="hand-score" style="font-size:0.9rem;">⭐ {{ dealer_hand.score }}</div>
+                        <div class="cards-row" style="flex-wrap:wrap;gap:4px;">
+                            {% for card in dealer_hand.cards %}
+                            <div class="playing-card playing-card--{{ 'red' if card.suit in ['hearts','diamonds'] else 'black' }}"
+                                style="width:32px;height:46px;padding:2px;">
+                                <span class="card-rank" style="font-size:0.85rem;">{{ card.rank }}</span>
+                                <span class="card-suit" style="font-size:0.85rem;">{{
+                                    {'spades':'♠','hearts':'♥','diamonds':'♦','clubs':'♣'}[card.suit] }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="hand-empty" style="font-size:0.8rem;text-align:left;">ยังไม่มีไพ่</div>
+                        {% endif %}
+                    </div>
                 </div>
-                {% else %}
-                <div class="hand-score" style="font-size: 0.95rem; margin-bottom: 4px;"><span
-                        style="color: var(--amber); font-weight: bold;">✋ ในมือ</span></div>
-                <div class="hand-empty" style="padding: 4px 0; font-size: 0.8rem; text-align: left;">ยังไม่มีไพ่</div>
+                {% for p in players %}
+                {% if not p.role == 'teacher' %}
+                <div class="participant selectable-target" id="player-{{ loop.index }}" data-token="{{ p.token }}"
+                    data-name="{{ p.nickname }}" data-hand-id="{{ p.hand.id if p.hand else '' }}" data-hand-index="0"
+                    data-hand-json='{{ p.hand | tojson if p.hand else "null" }}'
+                    style="background: var(--bg-hover); padding: 8px; border-radius: 6px; border: 1px solid var(--border); transition: all 0.2s;">
+                    <div class="participant-label" style="font-size: 0.85rem; margin-bottom: 4px;">
+                        {{ p.nickname }}
+                    </div>
+                    {% if p.hand %}
+                    <div class="hand-display" style="gap: 4px;">
+                        <div class="hand-score" style="font-size: 0.9rem;">⭐ {{ p.hand.score }}
+                            {% if p.hand.is_busted %}<span class="badge badge--bust"
+                                style="font-size: 0.6rem; padding: 2px 4px;">💥</span>{% endif %}
+                            {% if p.hand.is_blackjack %}<span class="badge badge--bj"
+                                style="font-size: 0.6rem; padding: 2px 4px;">🌟</span>{% endif %}
+                        </div>
+                        <div class="cards-row" style="flex-wrap: wrap; justify-content: flex-start; gap: 4px;">
+                            {% for card in p.hand.cards %}
+                            <div class="playing-card playing-card--{{ 'red' if card.suit in ['hearts','diamonds'] else 'black' }}"
+                                style="width: 32px; height: 46px; padding: 2px;">
+                                <span class="card-rank" style="font-size: 0.85rem;">{{ card.rank }}</span>
+                                <span class="card-suit" style="font-size: 0.85rem;">{{
+                                    {'spades':'♠','hearts':'♥','diamonds':'♦','clubs':'♣'}[card.suit] }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="hand-empty" style="font-size: 0.8rem; padding: 4px; text-align: left;">รอบันทึก...
+                    </div>
+                    {% endif %}
+                </div>
                 {% endif %}
+                {% endfor %}
+                <!-- Add player bar — visible in edit mode only -->
+                <div id="add-player-bar" style="display:none; gap:6px; margin-top:8px; flex-shrink:0;">
+                    <button id="btn-add-player" class="btn btn--ghost" style="flex:1; font-size:0.8rem; padding:4px;">➕
+                        เพิ่มผู้เล่น</button>
+                    <button id="btn-add-dealer" class="btn btn--ghost"
+                        style="flex:1; font-size:0.8rem; padding:4px; color:var(--gold);">🎲 เพิ่มดีลเลอร์</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== RIGHT: UNIVERSAL ACTION PANEL ===== -->
+        <div class="game-panel game-panel--action" style="display: flex; flex-direction: column;">
+
+            <h3 class="panel-subtitle" id="action-target-title"
+                style="margin-bottom: 8px; font-size: 1rem; color: var(--gold);">
+                🎯 กำลังกรอกไพ่ให้: 🎰 เจ้ามือ
+            </h3>
+
+            <!-- Preview of currently selected target's hand -->
+            <div
+                style="background: rgba(255,255,255,0.04); border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); padding: 8px; margin-bottom: 10px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                    <span style="color: var(--text-secondary); font-size: 0.8rem;">ไพ่ปัจจุบัน:</span>
+                    <div id="advice-body" style="font-size: 0.85rem; display: flex; align-items: center;"></div>
+                </div>
+                <div id="action-hand-preview">
+                    <!-- Dealer hand shown by default; dynamically updated when player is selected -->
+                    {% if dealer_hand and dealer_hand.cards %}
+                    <div class="hand-score" style="font-size:0.95rem;margin-bottom:4px;">⭐ {{ dealer_hand.score }}
+                        {% if dealer_hand.is_busted %}<span class="badge badge--bust"
+                            style="font-size:0.6rem;padding:2px 4px;">💥</span>{% endif %}
+                        {% if dealer_hand.is_blackjack %}<span class="badge badge--bj"
+                            style="font-size:0.6rem;padding:2px 4px;">🌟</span>{% endif %}
+                    </div>
+                    <div class="cards-row" style="flex-wrap:wrap;justify-content:flex-start;gap:4px;">
+                        {% for card in dealer_hand.cards %}
+                        <div class="playing-card playing-card--{{ 'red' if card.suit in ['hearts','diamonds'] else 'black' }}"
+                            style="width:32px;height:46px;padding:2px;">
+                            <span class="card-rank" style="font-size:0.85rem;">{{ card.rank }}</span>
+                            <span class="card-suit" style="font-size:0.85rem;">{{
+                                {'spades':'♠','hearts':'♥','diamonds':'♦','clubs':'♣'}[card.suit] }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="hand-empty" style="text-align:left;font-size:0.85rem;">ยังไม่มีไพ่</div>
+                    {% endif %}
+                </div>
             </div>
 
-            <!-- My Card Input -->
-            <div class="card-input-section" style="margin-top: 1rem; margin-bottom: 12px;">
+            <!-- Keep dealer-target as a selectable in the player list area; dealer section here removed -->
+
+
+            <!-- Universal Card Input -->
+            <div class="card-input-section" style="margin-top: auto; margin-bottom: 12px;">
                 <div class="card-selector">
                     <div class="selector-group">
-                        <div class="rank-grid" id="rank-grid-my" style="gap: 4px;">
+                        <div class="rank-grid" id="rank-grid" style="gap: 4px;">
                             {% for rank in ['A','2','3','4','5','6','7','8','9','10','J','Q','K'] %}
                             <button type="button" class="rank-btn" data-rank="{{ rank }}"
                                 style="padding: 6px 0; font-size: 1rem;">{{ rank }}</button>
@@ -58,7 +159,7 @@
                         </div>
                     </div>
                     <div class="selector-group" style="margin-top: 8px;">
-                        <div class="suit-grid" id="suit-grid-my" style="gap: 4px;">
+                        <div class="suit-grid" id="suit-grid" style="gap: 4px;">
                             <button type="button" class="suit-btn suit-btn--black" data-suit="spades"
                                 style="padding: 6px 0; font-size: 1.2rem;">♠</button>
                             <button type="button" class="suit-btn suit-btn--red" data-suit="hearts"
@@ -71,76 +172,17 @@
                     </div>
                 </div>
                 <div class="input-actions" style="margin-top: 8px; gap: 6px;">
-                    <button id="btn-add-my-card" class="btn btn--primary" style="padding: 8px;" disabled>➕
-                        ไพ่คุณ</button>
-                    <button id="btn-undo-my" class="btn btn--ghost" style="padding: 8px;">↩ ลบ</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ===== RIGHT: DEALER HAND ===== -->
-        <div class="game-panel game-panel--dealer">
-            <h3 class="panel-title" style="margin-bottom: 8px;">🎰 เจ้ามือ</h3>
-
-            <div class="hand-display" id="dealer-hand">
-                {% if dealer_hand and dealer_hand.cards %}
-                <div class="hand-score">⭐ {{ dealer_hand.score }}
-                    {% if dealer_hand.is_busted %}<span class="badge badge--bust">💥</span>{% endif %}
-                    {% if dealer_hand.is_blackjack %}<span class="badge badge--bj">🌟</span>{% endif %}
-                </div>
-                <div class="cards-row">
-                    {% for card in dealer_hand.cards %}
-                    <div
-                        class="playing-card playing-card--{{ 'red' if card.suit in ['hearts','diamonds'] else 'black' }}">
-                        <span class="card-rank">{{ card.rank }}</span>
-                        <span class="card-suit">{{ {'spades':'♠','hearts':'♥','diamonds':'♦','clubs':'♣'}[card.suit]
-                            }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="hand-empty">ยังไม่มีไพ่</div>
-                {% endif %}
-            </div>
-
-            <!-- Dealer Card Input -->
-            <div class="card-input-section" style="margin-top: 1rem; margin-bottom: 12px;">
-                <div class="card-selector">
-                    <div class="selector-group">
-                        <div class="rank-grid" id="rank-grid-dealer" style="gap: 4px;">
-                            {% for rank in ['A','2','3','4','5','6','7','8','9','10','J','Q','K'] %}
-                            <button type="button" class="rank-btn" data-rank="{{ rank }}"
-                                style="padding: 6px 0; font-size: 1rem;">{{ rank }}</button>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    <div class="selector-group" style="margin-top: 8px;">
-                        <div class="suit-grid" id="suit-grid-dealer" style="gap: 4px;">
-                            <button type="button" class="suit-btn suit-btn--black" data-suit="spades"
-                                style="padding: 6px 0; font-size: 1.2rem;">♠</button>
-                            <button type="button" class="suit-btn suit-btn--red" data-suit="hearts"
-                                style="padding: 6px 0; font-size: 1.2rem;">♥</button>
-                            <button type="button" class="suit-btn suit-btn--red" data-suit="diamonds"
-                                style="padding: 6px 0; font-size: 1.2rem;">♦</button>
-                            <button type="button" class="suit-btn suit-btn--black" data-suit="clubs"
-                                style="padding: 6px 0; font-size: 1.2rem;">♣</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="input-actions" style="margin-top: 8px; gap: 6px;">
-                    <button id="btn-add-dealer-card" class="btn btn--warning" style="padding: 8px;" disabled>➕
-                        ไพ่กองกลาง</button>
-                    <button id="btn-undo-dealer" class="btn btn--ghost" style="padding: 8px;">↩ ลบ</button>
+                    <button id="btn-add-card" class="btn btn--primary" style="padding: 8px;" disabled>➕
+                        เพิ่มไพ่</button>
+                    <button id="btn-undo-card" class="btn btn--ghost" style="padding: 8px;">↩ ลบใบล่าสุด</button>
+                    <button id="btn-split-hand" class="btn btn--gold" style="padding: 8px;">✂️ เพิ่มมือ</button>
                 </div>
             </div>
         </div>
 
     </div>
 
-    <!-- Player count banner -->
-    <div class="teacher-banner">
-        🔒 อาจารย์ไม่เห็นไพ่ของผู้เล่น — เห็นเฉพาะกองกลาง
-    </div>
+    <!-- Removed player count banner since Teacher can now see players directly -->
 </div>
 {% endblock %}
 

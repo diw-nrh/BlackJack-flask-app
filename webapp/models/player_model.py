@@ -8,7 +8,7 @@ class Player(me.Document):
     nickname = me.StringField(required=True, max_length=30)
     role = me.StringField(
         required=True,
-        choices=["player", "teacher"],
+        choices=["player", "teacher", "operator"],
     )
     session_token = me.StringField(required=True, unique=True)
     joined_at = me.DateTimeField(default=datetime.datetime.now)

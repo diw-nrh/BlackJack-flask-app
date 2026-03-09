@@ -19,19 +19,11 @@ def index():
 
 @module.route("/room/create", methods=["POST"])
 def create_room():
-    nickname = request.form.get("nickname", "").strip()
-    role = request.form.get("role", "player")
-
-    if not nickname:
-        flash("กรุณากรอกชื่อเล่น", "error")
-        return redirect(url_for("lobby.index"))
-
-    # สร้างห้องก่อน
+    # สร้างห้องก่อน — ผู้สร้างเป็น operator (ไม่ใช่ผู้เล่น)
     room_result = RoomService.create_room()
     room_code = room_result["room_code"]
 
-    # เข้าห้องในฐานะ creator
-    join_result = RoomService.join_room(room_code, nickname, role)
+    join_result = RoomService.join_room(room_code, "ผู้จัดการ", "operator")
     if not join_result["success"]:
         flash(join_result["error"], "error")
         return redirect(url_for("lobby.index"))
@@ -46,15 +38,13 @@ def create_room():
 
 @module.route("/room/join", methods=["POST"])
 def join_room():
-    nickname = request.form.get("nickname", "").strip()
-    role = request.form.get("role", "player")
     room_code = request.form.get("room_code", "").strip().upper()
 
-    if not nickname or not room_code:
-        flash("กรุณากรอกชื่อเล่นและรหัสห้อง", "error")
+    if not room_code:
+        flash("กรุณากรอกรหัสห้อง", "error")
         return redirect(url_for("lobby.index"))
 
-    result = RoomService.join_room(room_code, nickname, role)
+    result = RoomService.join_room(room_code, "ผู้จัดการ", "operator")
     if not result["success"]:
         flash(result["error"], "error")
         return redirect(url_for("lobby.index"))

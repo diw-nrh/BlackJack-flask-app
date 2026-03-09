@@ -354,6 +354,16 @@ body {
     color: var(--text-primary);
 }
 
+.btn--gold {
+    background: rgba(234, 179, 8, 0.15);
+    color: var(--gold);
+    border: 1px solid var(--gold);
+}
+
+.btn--gold:hover:not(:disabled) {
+    background: rgba(234, 179, 8, 0.3);
+}
+
 .btn--outline {
     background: transparent;
     color: var(--blue);

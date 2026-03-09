@@ -55,20 +55,24 @@ class RoomService:
         hand_map = {str(h.player_token): h for h in all_hands}
         dealer_hand = next((h for h in all_hands if h.role == "dealer"), None)
 
+        # operator/teacher can see all; player sees all too (everyone shares table info)
+        is_manager = viewer.role in ("teacher", "operator")
+
         players_data = []
         for p in players:
+            # Exclude operator and teacher from the player list shown in UI
+            if p.role in ("teacher", "operator"):
+                continue
+
             h = hand_map.get(p.session_token)
             is_self = p.session_token == viewer_token
-
-            # ผู้เล่นทั่วไปเห็นทุกคน, อาจารย์เห็นแค่ตัวเอง
-            can_see = viewer.role == "player" or is_self
 
             players_data.append({
                 "nickname": p.nickname,
                 "token": p.session_token,
                 "role": p.role,
                 "is_self": is_self,
-                "hand": h.to_dict(visible=can_see) if h else None,
+                "hand": h.to_dict(visible=True) if h else None,
             })
 
         return {
@@ -80,3 +84,24 @@ class RoomService:
             "players": players_data,
             "dealer_hand": dealer_hand.to_dict(visible=True) if dealer_hand else None,
         }
+
+    @staticmethod
+    def kick_player(room_code: str, target_token: str) -> dict:
+        """ลบผู้เล่นออกจากห้อง"""
+        player = Player.get_by_token(target_token)
+        if not player or player.room_code != room_code.upper():
+            return {"success": False, "error": "ไม่พบผู้เล่น"}
+
+        player.is_active = False
+        player.save()
+        return {"success": True, "nickname": player.nickname, "token": target_token}
+
+    @staticmethod
+    def rename_player(token: str, new_nickname: str) -> dict:
+        """เปลี่ยนชื่อผู้เล่น"""
+        player = Player.get_by_token(token)
+        if not player:
+            return {"success": False, "error": "ไม่พบผู้เล่น"}
+        player.nickname = new_nickname.strip()[:30]
+        player.save()
+        return {"success": True, "nickname": player.nickname}

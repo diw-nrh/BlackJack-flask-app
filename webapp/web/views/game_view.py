@@ -39,9 +39,11 @@ def game_board(room_code: str):
         flash(state["error"], "error")
         return redirect(url_for("lobby.index"))
 
+    # operator and teacher both get the teacher/management template
+    role = state.get("viewer_role", "player")
     template = (
         "game/game_teacher.html"
-        if state["viewer_role"] == "teacher"
+        if role in ("teacher", "operator")
         else "game/game_player.html"
     )
     return render_template(template, **state, room_code=room_code, token=token)

@@ -54,6 +54,8 @@ class Hand(me.Document):
     room_code = me.StringField(required=True)
     # player_token=None หมายถึง dealer/กองกลาง
     player_token = me.StringField()
+    # hand_index: 0 = มือหลัก, 1 = split มือที่ 1, 2 = split มือที่ 2
+    hand_index = me.IntField(default=0)
     nickname = me.StringField(default="เจ้ามือ")
     role = me.StringField(
         required=True,
@@ -67,7 +69,7 @@ class Hand(me.Document):
 
     meta = {
         "collection": "hands",
-        "indexes": ["round_id", "room_code", "player_token"],
+        "indexes": ["round_id", "room_code", "player_token", ["round_id", "player_token", "hand_index"]],
     }
 
     def add_card(self, rank: str, suit: str):
@@ -99,6 +101,7 @@ class Hand(me.Document):
         return {
             "id": str(self.id),
             "player_token": self.player_token,
+            "hand_index": self.hand_index,
             "nickname": self.nickname,
             "role": self.role,
             "score": self.score if visible else None,
