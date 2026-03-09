@@ -6,9 +6,11 @@ services:
     container_name: mongodb_blackjack
     restart: always
     ports:
-      - "27018:27017" # Map port เพื่อให้เครื่องหลักเข้าถึงได้โดยไม่ชนกับ MongoDB ในเครื่อง
+      - "27017:27017" # ใช้ port มาตรฐาน
     volumes:
-      - mongodb_data:/data/db # เก็บข้อมูลไว้ไม่ให้หายเมื่อปิด Container
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=appdb55 # ตรงกับ .env
 
 volumes:
   mongodb_data:

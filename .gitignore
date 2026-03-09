@@ -46,3 +46,5 @@ node_modules/
 
 # Cython debug symbols
 cython_debug/
+
+webapp/web/static/css/app.css
