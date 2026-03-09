@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 
 def load_config(app):
     load_dotenv()
-    app.config.from_object("webapp.default_settings")
 
     try:
         settings_path = os.environ.get("APP_SETTINGS")
@@ -55,11 +54,25 @@ def create_app():
 
 
 
-def get_program_options(default_host="127.0.0.1", default_port="8080"):
+def get_program_options(default_host="0.0.0.0", default_port="8080"):
     """
     Takes a flask.Flask instance and runs it. Parses
     command-line flags to configure the app.
     """
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        local_ip = "127.0.0.1"
+
+    print("=" * 60)
+    print("🃏 SERVER IS RUNNING ON LAN 🃏")
+    print(f"👉 บอกให้ทุกคนเข้าบนมือถือผ่าน: http://{local_ip}:{default_port} 👈")
+    print("=" * 60)
+    print("")
 
     # Set up the command-line options
     parser = optparse.OptionParser()

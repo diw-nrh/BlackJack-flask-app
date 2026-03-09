@@ -65,6 +65,7 @@ class RoomService:
 
             players_data.append({
                 "nickname": p.nickname,
+                "token": p.session_token,
                 "role": p.role,
                 "is_self": is_self,
                 "hand": h.to_dict(visible=can_see) if h else None,

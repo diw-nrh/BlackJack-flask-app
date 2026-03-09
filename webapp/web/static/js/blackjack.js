@@ -22,6 +22,11 @@ const BlackJack = (() => {
                 room_code: config.roomCode,
                 session_token: config.token,
             });
+
+            // Trigger initial advice fetch for the player automatically upon joining
+            setTimeout(() => {
+                triggerAdviceIfPlayer();
+            }, 200);
         });
         socket.on('disconnect', () => setConnected(false));
         socket.on('error', (data) => showToast(data.message, 'error'));
@@ -38,6 +43,16 @@ const BlackJack = (() => {
         } else {
             initTeacherUI();
         }
+
+        // Global Game Controls
+        document.getElementById('btn-start-round')?.addEventListener('click', () => {
+            if (confirm('คุณต้องการเริ่มรอบใหม่ใช่หรือไม่?\\nไพ่บนโต๊ะทั้งหมดจะถูกล้างทิ้ง')) {
+                socket.emit('round_start', {
+                    room_code: config.roomCode,
+                    session_token: config.token,
+                });
+            }
+        });
     }
 
     // ───────────────────────────────────────────────
@@ -59,12 +74,6 @@ const BlackJack = (() => {
             });
         });
 
-        document.getElementById('btn-advice')?.addEventListener('click', () => {
-            socket.emit('advice_request', {
-                room_code: config.roomCode,
-                session_token: config.token,
-            });
-        });
     }
 
     // ───────────────────────────────────────────────
@@ -136,14 +145,6 @@ const BlackJack = (() => {
             });
         });
 
-        // Round controls
-        document.getElementById('btn-start-round')?.addEventListener('click', () => {
-            socket.emit('round_start', {
-                room_code: config.roomCode,
-                session_token: config.token,
-            });
-        });
-
         document.getElementById('btn-end-round')?.addEventListener('click', () => {
             if (confirm('ยืนยันจบรอบ?')) {
                 socket.emit('round_end', {
@@ -191,10 +192,20 @@ const BlackJack = (() => {
     }
 
     // ───────────────────────────────────────────────
+    // ───────────────────────────────────────────────
     // SOCKET EVENT HANDLERS
     // ───────────────────────────────────────────────
+    function triggerAdviceIfPlayer() {
+        if (config.role === 'player') {
+            socket.emit('advice_request', {
+                room_code: config.roomCode,
+                session_token: config.token,
+            });
+        }
+    }
+
     function onHandUpdated(data) {
-        const { player_token, hand } = data;
+        const { player_token, nickname, role, hand } = data;
         const isMine = player_token === config.token;
 
         if (config.role === 'teacher' && isMine) {
@@ -204,27 +215,75 @@ const BlackJack = (() => {
         }
 
         if (config.role === 'player') {
-            // Find the participant block and update
+            // Find the participant block in the main list
+            let found = false;
             document.querySelectorAll('.participant').forEach(el => {
                 if (el.dataset.token === player_token) {
+                    found = true;
                     const display = el.querySelector('.hand-display');
                     if (display) display.innerHTML = renderHandHTML(hand);
                 }
             });
 
-            // If it's my own hand, auto-request advice
-            if (isMine && hand.cards?.length > 0) {
-                socket.emit('advice_request', {
-                    room_code: config.roomCode,
-                    session_token: config.token,
-                });
+            // Also update the action panel hand if it's mine
+            if (isMine) {
+                const actionHand = document.getElementById('my-action-hand');
+                if (actionHand) {
+                    const display = actionHand.querySelector('.hand-display');
+                    if (display) {
+                        // Use a smaller card styling for the action panel
+                        let compactHtml = renderHandHTML(hand).replace(/score">/g, 'score" style="font-size: 1.2rem;">');
+                        compactHtml = compactHtml.replace(/playing-card"/g, 'playing-card" style="width: 36px; height: 50px; padding: 2px;"');
+                        compactHtml = compactHtml.replace(/card-rank"/g, 'card-rank" style="font-size: 0.9rem;"');
+                        compactHtml = compactHtml.replace(/card-suit"/g, 'card-suit" style="font-size: 0.9rem;"');
+                        display.innerHTML = compactHtml;
+                    } else if (hand && hand.cards && hand.cards.length > 0) {
+                        // If it was previously empty, we need to rebuild the structure
+                        actionHand.innerHTML = `
+                            <h3 class="panel-title" style="margin-bottom: 12px; color: var(--green);">✋ ไพ่ในมือของคุณ (${nickname})</h3>
+                            <div class="hand-display">
+                                ${renderHandHTML(hand).replace(/score">/g, 'score" style="font-size: 1.2rem;">').replace(/playing-card"/g, 'playing-card" style="width: 36px; height: 50px; padding: 2px;"').replace(/card-rank"/g, 'card-rank" style="font-size: 0.9rem;"').replace(/card-suit"/g, 'card-suit" style="font-size: 0.9rem;"')}
+                            </div>
+                        `;
+                    }
+                }
             }
+
+            // If a completely new player joined and added a card, create their box dynamically
+            if (!found && config.role === 'player') {
+                const section = document.querySelector('.players-section');
+                if (section) {
+                    const el = document.createElement('div');
+                    el.className = 'participant';
+                    el.dataset.token = player_token;
+
+                    const roleIcon = role === 'player' ? '👤' : '🎯';
+                    const roleBadge = role === 'teacher' ? '<span class="badge badge--teacher">อาจารย์</span>' : '';
+                    const youBadge = isMine ? '<span class="badge badge--you">คุณ</span>' : '';
+
+                    el.innerHTML = `
+                        <div class="participant-label">
+                            ${roleIcon} ${nickname || 'ผู้เล่นใหม่'} ${youBadge} ${roleBadge}
+                        </div>
+                        <div class="hand-display">
+                            ${renderHandHTML(hand)}
+                        </div>
+                    `;
+                    section.appendChild(el);
+                }
+            }
+
+            // Advice depends on ALL visible cards (card counting), so we request an update whenever ANY hand changes
+            triggerAdviceIfPlayer();
         }
     }
 
     function onDealerUpdated(data) {
         const el = document.getElementById('dealer-hand');
         if (el) el.innerHTML = renderHandHTML(data.hand);
+
+        // Dealer card affects advice, so request update
+        triggerAdviceIfPlayer();
     }
 
     function onAdviceResponse(advice) {
@@ -232,25 +291,20 @@ const BlackJack = (() => {
         if (!body) return;
 
         if (advice.error) {
-            body.innerHTML = `<div class="advice-placeholder">${advice.error}</div>`;
+            // Keep the previous UI instead of showing an error when just recalculating passively
+            if (body.innerHTML.includes('advice-placeholder')) {
+                body.innerHTML = `<div class="advice-placeholder">${advice.error}</div>`;
+            }
             return;
         }
 
         const action = advice.action || 'HIT';
         const winProb = advice.win_probability || 0;
-        const actionLabels = { HIT: '🃏 HIT — หยิบเพิ่ม', STAND: '✋ STAND — หยุด', DOUBLE: '💰 DOUBLE — เพิ่มเดิมพัน', BUST: '💥 BUST!' };
+        const actionLabels = { HIT: '🃏สู้', STAND: '✋พอ', DOUBLE: '💰เบิ้ล', BUST: '💥ทะลุ' };
 
         body.innerHTML = `
-      <div class="advice-result">
-        <div class="advice-action advice-action--${action}">${actionLabels[action] || action}</div>
-        <div class="advice-win">โอกาสชนะ: <strong>${winProb}%</strong></div>
-        <div class="win-bar"><div class="win-bar__fill" style="width: ${winProb}%"></div></div>
-        <div class="advice-reason">${advice.reason || ''}</div>
-        <div class="advice-meta">
-          <span>คะแนน: ${advice.player_score}</span>
-          <span>Count: ${advice.true_count >= 0 ? '+' : ''}${advice.true_count}</span>
-        </div>
-      </div>
+      <span class="advice-action--${action}" style="font-weight: bold; margin-right: 6px;">${actionLabels[action] || action}</span>
+      <span style="color: var(--text-muted); font-size: 0.8rem;">ชนะ ${winProb}%</span>
     `;
     }
 
