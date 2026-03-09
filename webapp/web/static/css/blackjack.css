@@ -488,16 +488,7 @@ body {
     position: relative;
 }
 
-@media (min-width: 768px) {
-    .game-body {
-        display: grid;
-        grid-template-columns: 1fr 380px;
-    }
-
-    .game-body--teacher {
-        grid-template-columns: 1fr 1fr;
-    }
-}
+/* Removed @media (min-width: 768px) layout rules to keep mobile and desktop consistent (stacked) */
 
 .game-panel {
     padding: 16px;
@@ -505,12 +496,7 @@ body {
     -webkit-overflow-scrolling: touch;
 }
 
-@media (min-width: 768px) {
-    .game-panel {
-        padding: 20px;
-        border-right: 1px solid var(--border);
-    }
-}
+/* Keep mobile styles globally */
 
 .game-panel--table {
     flex: 1;
@@ -527,12 +513,7 @@ body {
     max-height: 50vh;
 }
 
-@media (min-width: 768px) {
-    .game-panel--action {
-        border-top: none;
-        max-height: none;
-    }
-}
+/* Removed desktop top border overrides to keep the action panel bottom placement clean */
 
 .game-panel--dealer {
     border-right: none;

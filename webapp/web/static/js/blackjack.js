@@ -231,18 +231,14 @@ const BlackJack = (() => {
                 if (actionHand) {
                     const display = actionHand.querySelector('.hand-display');
                     if (display) {
-                        // Use a smaller card styling for the action panel
-                        let compactHtml = renderHandHTML(hand).replace(/score">/g, 'score" style="font-size: 1.2rem;">');
-                        compactHtml = compactHtml.replace(/playing-card"/g, 'playing-card" style="width: 36px; height: 50px; padding: 2px;"');
-                        compactHtml = compactHtml.replace(/card-rank"/g, 'card-rank" style="font-size: 0.9rem;"');
-                        compactHtml = compactHtml.replace(/card-suit"/g, 'card-suit" style="font-size: 0.9rem;"');
-                        display.innerHTML = compactHtml;
+                        // Directly inject the standardized HTML
+                        display.innerHTML = renderHandHTML(hand);
                     } else if (hand && hand.cards && hand.cards.length > 0) {
                         // If it was previously empty, we need to rebuild the structure
+                        // Rebuild structure with the native render template
                         actionHand.innerHTML = `
-                            <h3 class="panel-title" style="margin-bottom: 12px; color: var(--green);">✋ ไพ่ในมือของคุณ (${nickname})</h3>
-                            <div class="hand-display">
-                                ${renderHandHTML(hand).replace(/score">/g, 'score" style="font-size: 1.2rem;">').replace(/playing-card"/g, 'playing-card" style="width: 36px; height: 50px; padding: 2px;"').replace(/card-rank"/g, 'card-rank" style="font-size: 0.9rem;"').replace(/card-suit"/g, 'card-suit" style="font-size: 0.9rem;"')}
+                            <div class="hand-display" style="gap: 4px;">
+                                ${renderHandHTML(hand)}
                             </div>
                         `;
                     }
@@ -335,18 +331,18 @@ const BlackJack = (() => {
         if (!hand || !hand.cards || hand.cards.length === 0) {
             return '<div class="hand-empty">ยังไม่มีไพ่</div>';
         }
-        const bustedBadge = hand.is_busted ? '<span class="badge badge--bust">BUST</span>' : '';
-        const bjBadge = hand.is_blackjack ? '<span class="badge badge--bj">BJ!</span>' : '';
+        const bustedBadge = hand.is_busted ? '<span class="badge badge--bust" style="font-size: 0.6rem; padding: 2px 4px;">💥</span>' : '';
+        const bjBadge = hand.is_blackjack ? '<span class="badge badge--bj" style="font-size: 0.6rem; padding: 2px 4px;">🌟</span>' : '';
         const cardsHTML = hand.cards.map(c => {
             const color = RED_SUITS.includes(c.suit) ? 'red' : 'black';
-            return `<div class="playing-card playing-card--${color}">
-        <span class="card-rank">${c.rank}</span>
-        <span class="card-suit">${SUIT_SYMBOLS[c.suit] || c.suit}</span>
+            return `<div class="playing-card playing-card--${color}" style="width: 32px; height: 46px; padding: 2px;">
+        <span class="card-rank" style="font-size: 0.85rem;">${c.rank}</span>
+        <span class="card-suit" style="font-size: 0.85rem;">${SUIT_SYMBOLS[c.suit] || c.suit}</span>
       </div>`;
         }).join('');
         return `
-      <div class="hand-score">${hand.score} คะแนน ${bustedBadge}${bjBadge}</div>
-      <div class="cards-row">${cardsHTML}</div>
+      <div class="hand-score" style="font-size: 0.95rem; margin-bottom: 4px;">⭐ ${hand.score} ${bustedBadge}${bjBadge}</div>
+      <div class="cards-row" style="flex-wrap: wrap; justify-content: flex-start; gap: 4px;">${cardsHTML}</div>
     `;
     }
 
