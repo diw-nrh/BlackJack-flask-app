@@ -196,6 +196,7 @@ def get_advice(player_cards: list, dealer_upcard: str | None, true_count: float 
             "player_score": 0,
             "dealer_upcard": dealer_upcard,
             "true_count": true_count,
+            "action_stats": {},
         }
 
     # คำนวณ player score
@@ -224,6 +225,7 @@ def get_advice(player_cards: list, dealer_upcard: str | None, true_count: float 
             "player_score": player_score,
             "dealer_upcard": dealer_upcard,
             "true_count": 0.0,
+            "action_stats": {},
         }
     if player_score == 21:
         is_blackjack = len(player_cards) == 2
@@ -235,6 +237,7 @@ def get_advice(player_cards: list, dealer_upcard: str | None, true_count: float 
             "player_score": player_score,
             "dealer_upcard": dealer_upcard,
             "true_count": true_count,
+            "action_stats": {},
         }
 
     # Basic strategy
@@ -286,6 +289,20 @@ def get_advice(player_cards: list, dealer_upcard: str | None, true_count: float 
 
     win_prob = _win_probability(action, player_score, effective_upcard, true_count, player_cards)
 
+    action_stats = {
+        "HIT": _win_probability(ACTION_HIT, player_score, effective_upcard, true_count, player_cards),
+        "STAND": _win_probability(ACTION_STAND, player_score, effective_upcard, true_count, player_cards)
+    }
+
+    if len(player_cards) == 2:
+        action_stats["DOUBLE"] = _win_probability(ACTION_DOUBLE, player_score, effective_upcard, true_count, player_cards)
+        
+        def _get_rank_val(r):
+            return 10 if r in ["J", "Q", "K"] else (11 if r == "A" else int(r))
+        
+        if _get_rank_val(player_cards[0]["rank"]) == _get_rank_val(player_cards[1]["rank"]):
+            action_stats["SPLIT"] = _win_probability(ACTION_SPLIT, player_score, effective_upcard, true_count, player_cards)
+
     # สร้างเหตุผล
     reasons = []
     if reason_prefix:
@@ -306,4 +323,5 @@ def get_advice(player_cards: list, dealer_upcard: str | None, true_count: float 
         "is_soft": is_soft,
         "dealer_upcard": dealer_upcard,
         "true_count": true_count,
+        "action_stats": action_stats,
     }

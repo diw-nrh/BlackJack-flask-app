@@ -678,10 +678,26 @@ const BlackJack = (() => {
         if (advice.error) { return; }
         const action = advice.action || 'HIT';
         const winProb = advice.win_probability || 0;
-        const actionLabels = { HIT: '🃏สู้', STAND: '✋พอ', DOUBLE: '💰เบิ้ล', BUST: '💥ทะลุ' };
+        const stats = advice.action_stats || {};
+        const actionLabels = { HIT: '🃏 สู้ (HIT)', STAND: '✋ พอ (STAND)', DOUBLE: '💰 เบิ้ล (DOUBLE)', SPLIT: '✂️ แยก (SPLIT)', BUST: '💥 ทะลุ (BUST)', BLACKJACK: '🌟 แบล็คแจ็ค' };
+
+        // Build alternative stats HTML
+        let statsHTML = '';
+        if (Object.keys(stats).length > 0) {
+            const statItems = Object.entries(stats)
+                .filter(([act]) => act !== action) // Only show alternatives
+                .map(([act, prob]) => `<span style="color:#94a3b8;">${act}(${prob}%)</span>`)
+                .join(' <span style="color:#475569;margin:0 4px;">|</span> ');
+            if (statItems) {
+                statsHTML = `<span style="margin-left:8px; padding-left:8px; border-left:1px solid rgba(255,255,255,0.2); font-size:0.75rem; color:var(--text-muted); display:flex; align-items:center;">ทางเลือก: <span style="margin-left:6px; display:flex; align-items:center;">${statItems}</span></span>`;
+            }
+        }
+
         body.innerHTML = `
-            <span class="advice-action--${action}" style="font-weight:bold;margin-right:6px;">${actionLabels[action] || action}</span>
-            <span style="color:var(--text-muted);font-size:0.8rem;">ชนะ ${winProb}%</span>
+            <span style="color:var(--gold); margin-right:4px;">⭐ แนะนำ:</span>
+            <span class="advice-action--${action}" style="font-weight:bold;margin-right:4px;">${actionLabels[action] || action}</span>
+            <span style="color:var(--text-main);font-size:0.85rem;font-weight:bold;">${winProb}%</span>
+            ${statsHTML}
         `;
     }
 

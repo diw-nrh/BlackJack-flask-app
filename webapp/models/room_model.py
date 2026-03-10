@@ -22,7 +22,7 @@ class Room(me.Document):
     # Shoe & Discard State
     # -------------------------------------------------------------
     # Number of decks configured for this room (1, 2, 4, 6, 8)
-    total_decks = me.IntField(default=6, choices=[1, 2, 4, 6, 8])
+    total_decks = me.IntField(default=6, choices=[1, 2, 3, 4, 6, 8])
     # Array of remaining cards (dict: rank, suit)
     shoe = me.ListField(me.DictField())
     # Array of played cards
