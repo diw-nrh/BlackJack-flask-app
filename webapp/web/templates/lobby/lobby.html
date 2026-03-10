@@ -17,6 +17,19 @@
             <h2 class="card__title">🎲 สร้างห้องใหม่</h2>
             <p class="card__desc">สร้างห้องแล้วแชร์รหัสให้เพื่อน — ตั้งชื่อได้หลังเข้าห้อง</p>
             <form method="POST" action="/room/create" class="form">
+                <div class="form__field" style="margin-bottom: 12px; text-align: left;">
+                    <label class="form__label" for="total_decks"
+                        style="display: block; margin-bottom: 4px; font-size: 0.85em; color: var(--text-muted);">จำนวนสำรับไพ่
+                        (Decks)</label>
+                    <select name="total_decks" id="total_decks" class="form__input"
+                        style="width: 100%; appearance: none; cursor: pointer;">
+                        <option value="1">1 สำรับ (52 ใบ)</option>
+                        <option value="2">2 สำรับ (104 ใบ)</option>
+                        <option value="4">4 สำรับ (208 ใบ)</option>
+                        <option value="6" selected>6 สำรับ (312 ใบ) - ทั่วไป</option>
+                        <option value="8">8 สำรับ (416 ใบ)</option>
+                    </select>
+                </div>
                 <button type="submit" class="btn btn--primary btn--full">สร้างห้อง →</button>
             </form>
         </div>

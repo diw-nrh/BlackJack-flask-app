@@ -5,27 +5,36 @@
 <div class="game game--player" id="game-app" data-room="{{ room_code }}" data-token="{{ token }}" data-role="player"
     data-nickname="{{ viewer_nickname }}">
 
-    <div class="game-body" style="padding-top: 12px; position: relative;">
-        <!-- Floating Next Round Button -->
-        <button id="btn-start-round" class="btn btn--primary"
-            style="position: fixed; top: 12px; right: 12px; z-index: 50; padding: 6px 12px; font-size: 0.85rem; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 4px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-            เริ่มรอบใหม่
-        </button>
-        <!-- Room code + Gear / Edit Mode Toggle -->
-        <div
-            style="position: fixed; top: 12px; right: 130px; z-index: 50; display: flex; align-items: center; gap: 6px;">
+    <!-- Navigation Bar -->
+    <div class="game-navbar"
+        style="background: rgba(10, 10, 15, 0.9); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 50; flex-shrink: 0; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+        <div class="navbar-left" style="display: flex; align-items: center; gap: 12px;">
+            <div class="navbar-title"
+                style="font-weight: 700; font-size: 1.1rem; color: var(--primary); letter-spacing: 0.5px;">Blackjack AI
+                Player</div>
             <span
-                style="font-size:0.75rem; color:var(--text-secondary); background:rgba(255,255,255,0.08); border:1px solid var(--border); border-radius:12px; padding:4px 10px; letter-spacing:0.1em;">{{
-                room_code }}</span>
+                style="font-size: 0.8rem; color: var(--text-secondary); background: rgba(255,255,255,0.08); border: 1px solid var(--border); border-radius: 12px; padding: 4px 10px; letter-spacing: 0.1em;">ห้อง:
+                {{ room_code }}</span>
+        </div>
+
+        <div class="navbar-right" style="display: flex; align-items: center; gap: 8px;">
+            <button id="btn-start-round" class="btn btn--primary"
+                style="padding: 6px 12px; font-size: 0.85rem; border-radius: 6px; display: flex; align-items: center; gap: 4px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                เริ่มรอบใหม่
+            </button>
+            <div style="width: 1px; height: 24px; background: var(--border); margin: 0 4px;"></div>
             <button id="btn-edit-mode" title="โหมดแก้ไข"
-                style="background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: var(--text-secondary); border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 1rem;">
+                style="background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: var(--text-secondary); border-radius: 6px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 1rem;">
                 ⚙️
             </button>
         </div>
+    </div>
+
+    <div class="game-body" style="padding-top: 0; position: relative;">
 
         <!-- ===== TOP: TABLE VIEW (2 Columns) ===== -->
         <div class="game-panel game-panel--table"
@@ -69,40 +78,59 @@
                     ผู้เล่นทั้งหมด (คลิกเพื่อเลือก)</h3>
                 <div class="players-section" style="display: flex; flex-direction: column; gap: 12px;">
                     {% for p in players %}
-                    <div class="participant selectable-target" id="player-{{ loop.index }}" data-token="{{ p.token }}"
-                        data-name="{{ p.nickname }}" data-hand-id="{{ p.hand.id if p.hand else '' }}"
-                        data-hand-index="0" data-hand-json='{{ p.hand | tojson if p.hand else "null" }}'
-                        style="background: var(--bg-hover); padding: 8px; border-radius: 6px; border: 1px solid var(--border); transition: all 0.2s; cursor: pointer;">
-                        <div class="participant-label" style="font-size: 0.85rem; margin-bottom: 4px;">
+                    <div class="player-wrapper" data-token="{{ p.token }}" id="player-{{ loop.index }}"
+                        style="border-left: 4px solid transparent; background: var(--bg-hover); padding: 8px; border-radius: 6px; margin-bottom: 4px; border: 1px solid var(--border); transition: all 0.2s;">
+                        <div class="participant-label"
+                            style="font-size: 0.85rem; margin-bottom: 4px; font-weight: bold;">
                             {{ p.nickname }}
                             {% if p.is_self %}<span class="badge badge--you"
                                 style="font-size: 0.65rem; padding: 2px 6px;">คุณ</span>{% endif %}
                             {% if p.role == 'teacher' %}<span class="badge badge--teacher"
                                 style="font-size: 0.65rem; padding: 2px 6px;">อาจารย์</span>{% endif %}
                         </div>
-                        {% if p.hand %}
-                        <div class="hand-display" style="gap: 4px;">
-                            <div class="hand-score" style="font-size: 0.9rem;">⭐ {{ p.hand.score }}
-                                {% if p.hand.is_busted %}<span class="badge badge--bust"
-                                    style="font-size: 0.6rem; padding: 2px 4px;">💥</span>{% endif %}
-                                {% if p.hand.is_blackjack %}<span class="badge badge--bj"
-                                    style="font-size: 0.6rem; padding: 2px 4px;">🌟</span>{% endif %}
-                            </div>
-                            <div class="cards-row" style="flex-wrap: wrap; justify-content: flex-start; gap: 4px;">
-                                {% for card in p.hand.cards %}
-                                <div class="playing-card playing-card--{{ 'red' if card.suit in ['hearts','diamonds'] else 'black' }}"
-                                    style="width: 32px; height: 46px; padding: 2px;">
-                                    <span class="card-rank" style="font-size: 0.85rem;">{{ card.rank }}</span>
-                                    <span class="card-suit" style="font-size: 0.85rem;">{{
-                                        {'spades':'♠','hearts':'♥','diamonds':'♦','clubs':'♣'}[card.suit] }}</span>
+
+                        <div class="hands-container" style="display: flex; flex-direction: column; gap: 4px;">
+                            {% if p.hands %}
+                            {% for hand in p.hands %}
+                            <div class="participant selectable-target" data-token="{{ p.token }}"
+                                data-name="{{ p.nickname }}" data-hand-id="{{ hand.id }}"
+                                data-hand-index="{{ hand.hand_index }}" data-hand-json='{{ hand | tojson }}'
+                                style="background: rgba(255,255,255,0.03); padding: 6px; border-radius: 4px; border: 1px solid transparent; transition: all 0.2s; cursor: pointer;">
+                                <div class="hand-display" style="gap: 4px; margin-bottom: 2px;">
+                                    <div class="hand-score" style="font-size: 0.9rem;">
+                                        {% if hand.hand_index > 0 %} <span
+                                            style="font-size:0.75rem;color:var(--text-muted);margin-right:4px;">มือ {{
+                                            hand.hand_index + 1 }}</span> {% endif %}
+                                        ⭐ {{ hand.score }}
+                                        {% if hand.is_busted %}<span class="badge badge--bust"
+                                            style="font-size: 0.6rem; padding: 2px 4px;">💥</span>{% endif %}
+                                        {% if hand.is_blackjack %}<span class="badge badge--bj"
+                                            style="font-size: 0.6rem; padding: 2px 4px;">🌟</span>{% endif %}
+                                    </div>
+                                    <div class="cards-row"
+                                        style="flex-wrap: wrap; justify-content: flex-start; gap: 4px;">
+                                        {% for card in hand.cards %}
+                                        <div class="playing-card playing-card--{{ 'red' if card.suit in ['hearts','diamonds'] else 'black' }}"
+                                            style="width: 32px; height: 46px; padding: 2px;">
+                                            <span class="card-rank" style="font-size: 0.85rem;">{{ card.rank }}</span>
+                                            <span class="card-suit" style="font-size: 0.85rem;">{{
+                                                {'spades':'♠','hearts':'♥','diamonds':'♦','clubs':'♣'}[card.suit]
+                                                }}</span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
                                 </div>
-                                {% endfor %}
                             </div>
+                            {% endfor %}
+                            {% else %}
+                            <div class="participant selectable-target" data-token="{{ p.token }}"
+                                data-name="{{ p.nickname }}" data-hand-index="0"
+                                style="background: rgba(255,255,255,0.03); padding: 6px; border-radius: 4px; border: 1px solid transparent; cursor: pointer;">
+                                <div class="hand-empty" style="font-size: 0.8rem; padding: 4px; text-align: left;">
+                                    รอบันทึก...</div>
+                            </div>
+                            {% endif %}
                         </div>
-                        {% else %}
-                        <div class="hand-empty" style="font-size: 0.8rem; padding: 4px; text-align: left;">รอบันทึก...
-                        </div>
-                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -137,17 +165,18 @@
                 </div>
 
                 <div id="action-hand-preview">
-                    {% if my_player and my_player.hand %}
+                    {% if my_player and my_player.hands %}
+                    {% set hand = my_player.hands[0] %}
                     <div class="hand-display" style="gap: 4px;">
                         <div class="hand-score" style="font-size: 0.95rem; margin-bottom: 4px;">
-                            <span>⭐ {{ my_player.hand.score }}</span>
-                            {% if my_player.hand.is_busted %}<span class="badge badge--bust"
+                            <span>⭐ {{ hand.score }}</span>
+                            {% if hand.is_busted %}<span class="badge badge--bust"
                                 style="font-size: 0.6rem; padding: 2px 4px;">💥</span>{% endif %}
-                            {% if my_player.hand.is_blackjack %}<span class="badge badge--bj"
+                            {% if hand.is_blackjack %}<span class="badge badge--bj"
                                 style="font-size: 0.6rem; padding: 2px 4px;">🌟</span>{% endif %}
                         </div>
                         <div class="cards-row" style="flex-wrap: wrap; justify-content: flex-start; gap: 4px;">
-                            {% for card in my_player.hand.cards %}
+                            {% for card in hand.cards %}
                             <div class="playing-card playing-card--{{ 'red' if card.suit in ['hearts','diamonds'] else 'black' }}"
                                 style="width: 32px; height: 46px; padding: 2px;">
                                 <span class="card-rank" style="font-size: 0.85rem;">{{ card.rank }}</span>
@@ -157,6 +186,8 @@
                             {% endfor %}
                         </div>
                     </div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); text-align:right; margin-top:4px;">
+                        (เลือกมืออื่นจากตารางซ้ายเพื่อกรอกไพ่)</div>
                     {% else %}
                     <div class="hand-empty" style="padding: 4px 0; font-size: 0.8rem; text-align: left;">
                         ยังไม่มีไพ่</div>

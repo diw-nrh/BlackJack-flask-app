@@ -16,7 +16,14 @@ from ..services.strategy_service import get_advice
 from ..models.player_model import Player
 from ..models.round_model import Round
 from ..models.hand_model import Hand
+from ..models.room_model import Room
 
+
+def emit_room_stats(room_code: str):
+    """Broadcast exact shoe statistics to all clients in the room (for Mathematician Dashboard)"""
+    room = Room.get_by_code(room_code)
+    if room:
+        socketio.emit("shoe_updated", room.get_shoe_stats(), room=room_code)
 
 def _get_all_visible_cards(round_id) -> list:
     """รวบรวมไพ่ทั้งหมดในรอบสำหรับ card counting"""
@@ -80,6 +87,9 @@ def on_card_add(data):
         room=room_code,
     )
 
+    # Broadcast updated shoe stats
+    emit_room_stats(room_code)
+
 
 @socketio.on("dealer_add")
 def on_dealer_add(data):
@@ -101,6 +111,9 @@ def on_dealer_add(data):
         return
 
     socketio.emit("dealer_updated", {"hand": result["hand"]}, room=room_code)
+    
+    # Broadcast updated shoe stats
+    emit_room_stats(room_code)
 
 
 @socketio.on("advice_request")
@@ -109,6 +122,7 @@ def on_advice_request(data):
     room_code = data.get("room_code", "").upper()
     session_token = data.get("session_token", "")
     target_token = data.get("target_token") or session_token  # default: own hand
+    target_hand_id = data.get("target_hand_id")
 
     caller = Player.get_by_token(session_token)
     if not caller:
@@ -120,16 +134,22 @@ def on_advice_request(data):
         emit("advice_response", {"error": "ยังไม่มีรอบที่กำลังเล่น"})
         return
 
-    player_hand = Hand.objects(
-        round_id=current_round.id, player_token=target_token
-    ).first()
+    if target_hand_id:
+        player_hand = Hand.objects(id=target_hand_id).first()
+    else:
+        player_hand = Hand.objects(
+            round_id=current_round.id, player_token=target_token
+        ).first()
+
     dealer_hand = HandService.get_dealer_hand(current_round.id)
 
     player_cards = [c.to_dict() for c in player_hand.cards] if player_hand else []
     dealer_upcard = dealer_hand.cards[0].rank if (dealer_hand and dealer_hand.cards) else None
-    all_visible = _get_all_visible_cards(current_round.id)
+    
+    room = Room.get_by_code(room_code)
+    true_count = room.get_shoe_stats().get("true_count", 0.0) if room else 0.0
 
-    advice = get_advice(player_cards, dealer_upcard, all_visible)
+    advice = get_advice(player_cards, dealer_upcard, true_count)
     emit("advice_response", advice)
 
 
@@ -147,6 +167,9 @@ def on_round_start(data):
     result = RoundService.start_round(room_code, dealer_nickname="เจ้ามือ")
     socketio.emit("round_started", result["round"], room=room_code)
 
+    # Broadcast updated shoe stats (shuffled shoe)
+    emit_room_stats(room_code)
+
 
 @socketio.on("round_end")
 def on_round_end(data):
@@ -161,6 +184,27 @@ def on_round_end(data):
 
     result = RoundService.end_round(room_code)
     socketio.emit("round_ended", result, room=room_code)
+
+    # Broadcast updated shoe stats (discard pile populated)
+    emit_room_stats(room_code)
+
+
+@socketio.on("manual_reshuffle")
+def on_manual_reshuffle(data):
+    """อาจารย์กดปุ่มสับไพ่ใหม่ (Manual Reshuffle Override)"""
+    room_code = data.get("room_code", "").upper()
+    session_token = data.get("session_token", "")
+
+    player = Player.get_by_token(session_token)
+    if not player or player.role not in ["teacher", "operator"]:
+        emit("error", {"message": "เฉพาะอาจารย์เท่านั้น"})
+        return
+
+    room = Room.get_by_code(room_code)
+    if room:
+        room.shuffle_shoe()
+        # Broadcast updated shoe stats (cleared discard pile and regenerated deck)
+        emit_room_stats(room_code)
 
 
 @socketio.on("undo_card")
@@ -181,6 +225,35 @@ def on_undo_card(data):
         {"player_token": target_token, "hand_id": result["hand"]["id"], "hand_index": result["hand"]["hand_index"], "hand": result["hand"]},
         room=room_code,
     )
+
+    # Broadcast updated shoe stats (card returned to shoe)
+    emit_room_stats(room_code)
+
+
+@socketio.on("undo_dealer")
+def on_undo_dealer(data):
+    """ลบไพ่ใบล่าสุดของ dealer"""
+    room_code = data.get("room_code", "").upper()
+    session_token = data.get("session_token", "")
+    
+    player = Player.get_by_token(session_token)
+    if not player or player.role not in ["teacher", "operator"]:
+        emit("error", {"message": "เฉพาะอาจารย์เท่านั้น"})
+        return
+
+    result = HandService.undo_dealer_card(room_code)
+    if not result["success"]:
+        emit("error", {"message": result["error"]})
+        return
+
+    socketio.emit(
+        "dealer_updated",
+        {"hand": result["hand"]},
+        room=room_code,
+    )
+
+    # Broadcast updated shoe stats (card returned to shoe)
+    emit_room_stats(room_code)
 
 
 @socketio.on("split_hand")
@@ -235,6 +308,9 @@ def on_delete_hand(data):
         },
         room=room_code,
     )
+
+    # Broadcast updated shoe stats (all cards in hand returned to shoe)
+    emit_room_stats(room_code)
 
 
 @socketio.on("kick_player")

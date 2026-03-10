@@ -32,7 +32,9 @@ class HandService:
 
     @staticmethod
     def add_card_to_player(room_code: str, player_token: str, rank: str, suit: str, hand_id: str = None) -> dict:
-        """เพิ่มไพ่ให้ผู้เล่น — ระบุโดย token หรือ hand_id (สำหรับ split)"""
+        """เพิ่มไพ่ให้ผู้เล่น — ดึงจาก Shoe จริง และระบุโดย token หรือ hand_id (สำหรับ split)"""
+        from ..models.room_model import Room  # Import inside to avoid circular deps if any
+        
         current_round = Round.get_current_round(room_code)
         if not current_round:
             return {"success": False, "error": "ยังไม่มีรอบที่กำลังเล่น กรุณาให้อาจารย์เริ่มรอบก่อน"}
@@ -58,7 +60,16 @@ class HandService:
         if hand.is_busted:
             return {"success": False, "error": "bust แล้ว ไม่สามารถหยิบไพ่เพิ่มได้"}
 
+        # 1. Pop exact card from the strict shoe tracking
+        room = Room.get_by_code(room_code)
+        if room:
+            actual_card = room.pop_card(rank, suit)
+            rank = actual_card["rank"]
+            suit = actual_card["suit"]
+
+        # 2. Add to player's hand
         card = hand.add_card(rank=rank, suit=suit)
+        
         return {
             "success": True,
             "card": card.to_dict(),
@@ -69,7 +80,9 @@ class HandService:
 
     @staticmethod
     def add_card_to_dealer(room_code: str, rank: str, suit: str) -> dict:
-        """เพิ่มไพ่ให้ dealer (กองกลาง)"""
+        """เพิ่มไพ่ให้ dealer (กองกลาง) — ดึงจาก Shoe จริง"""
+        from ..models.room_model import Room
+
         current_round = Round.get_current_round(room_code)
         if not current_round:
             return {"success": False, "error": "ยังไม่มีรอบที่กำลังเล่น"}
@@ -78,7 +91,16 @@ class HandService:
         if not hand:
             return {"success": False, "error": "ไม่พบ dealer hand กรุณาเริ่มรอบใหม่"}
 
+        # 1. Pop exact card from the strict shoe tracking
+        room = Room.get_by_code(room_code)
+        if room:
+            actual_card = room.pop_card(rank, suit)
+            rank = actual_card["rank"]
+            suit = actual_card["suit"]
+
+        # 2. Add to dealer's hand
         card = hand.add_card(rank=rank, suit=suit)
+        
         return {
             "success": True,
             "card": card.to_dict(),
@@ -141,6 +163,41 @@ class HandService:
         if not hand or not hand.cards:
             return {"success": False, "error": "ไม่มีไพ่ให้ลบ"}
 
+        # 1. Get the card being removed
+        last_card = hand.cards[-1]
+
+        # 2. Return to shoe
+        from ..models.room_model import Room
+        room = Room.get_by_code(room_code)
+        if room:
+            room.shoe.append({"rank": last_card.rank, "suit": last_card.suit})
+            room.save()
+
+        # 3. Remove from hand
+        hand.remove_last_card()
+        return {"success": True, "hand": hand.to_dict(visible=True)}
+    @staticmethod
+    def undo_dealer_card(room_code: str) -> dict:
+        """ลบไพ่ใบล่าสุดออก (undo) สำหรับ dealer"""
+        current_round = Round.get_current_round(room_code)
+        if not current_round:
+            return {"success": False, "error": "ไม่มีรอบที่กำลังเล่น"}
+
+        hand = HandService.get_dealer_hand(current_round.id)
+        if not hand or not hand.cards:
+            return {"success": False, "error": "ไม่มีไพ่ให้ลบ"}
+
+        # 1. Get the card being removed
+        last_card = hand.cards[-1]
+
+        # 2. Return to shoe
+        from ..models.room_model import Room
+        room = Room.get_by_code(room_code)
+        if room:
+            room.shoe.append({"rank": last_card.rank, "suit": last_card.suit})
+            room.save()
+
+        # 3. Remove from hand
         hand.remove_last_card()
         return {"success": True, "hand": hand.to_dict(visible=True)}
 
@@ -168,6 +225,15 @@ class HandService:
         if hand.role == "dealer":
             return {"success": False, "error": "ไม่สามารถลบมือเจ้ามือได้"}
 
+        # 1. Return all cards in this hand back to the shoe
+        from ..models.room_model import Room
+        room = Room.get_by_code(room_code)
+        if room and hand.cards:
+            for card in hand.cards:
+                room.shoe.append({"rank": card.rank, "suit": card.suit})
+            room.save()
+
+        # 2. Delete hand
         player_token = hand.player_token
         hand.delete()
 

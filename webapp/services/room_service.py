@@ -6,9 +6,9 @@ from ..models.hand_model import Hand
 
 class RoomService:
     @staticmethod
-    def create_room() -> dict:
+    def create_room(total_decks: int = 6) -> dict:
         """สร้างห้องใหม่ คืนค่า room_code"""
-        room = Room.create_room()
+        room = Room.create_room(total_decks=total_decks)
         return {"success": True, "room_code": room.room_code, "room": room.to_dict()}
 
     @staticmethod
@@ -51,9 +51,17 @@ class RoomService:
         players = Player.get_room_players(room_code)
         all_hands = Hand.objects(round_id=round_id) if round_id else []
 
-        # สร้าง dict ของ hand ตาม player_token
-        hand_map = {str(h.player_token): h for h in all_hands}
-        dealer_hand = next((h for h in all_hands if h.role == "dealer"), None)
+        # สร้าง dict ของ hand ตาม player_token (1 token -> List[Hand])
+        hand_map = {}
+        dealer_hand = None
+        for h in all_hands:
+            if h.role == "dealer":
+                dealer_hand = h
+                continue
+            token_str = str(h.player_token)
+            if token_str not in hand_map:
+                hand_map[token_str] = []
+            hand_map[token_str].append(h)
 
         # operator/teacher can see all; player sees all too (everyone shares table info)
         is_manager = viewer.role in ("teacher", "operator")
@@ -64,7 +72,10 @@ class RoomService:
             if p.role in ("teacher", "operator"):
                 continue
 
-            h = hand_map.get(p.session_token)
+            p_hands = hand_map.get(p.session_token, [])
+            # เรียงตาม hand_index เพื่อความชัวร์
+            p_hands.sort(key=lambda h: h.hand_index)
+
             is_self = p.session_token == viewer_token
 
             players_data.append({
@@ -72,7 +83,7 @@ class RoomService:
                 "token": p.session_token,
                 "role": p.role,
                 "is_self": is_self,
-                "hand": h.to_dict(visible=True) if h else None,
+                "hands": [h.to_dict(visible=True) for h in p_hands],
             })
 
         return {

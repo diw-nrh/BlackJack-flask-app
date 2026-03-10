@@ -23,6 +23,17 @@ const BlackJack = (() => {
     // ─── Edit mode (gear icon) ─────────────────────────────────────────
     let editMode = false;
 
+    // ─── Player Color Palette ──────────────────────────────────────────
+    function getPlayerColor(token) {
+        if (!token) return 'transparent';
+        const cols = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e', '#0ea5e9', '#84cc16'];
+        let hash = 0;
+        for (let i = 0; i < token.length; i++) {
+            hash = token.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return cols[Math.abs(hash) % cols.length];
+    }
+
     // ───────────────────────────────────────────────
     // INIT
     // ───────────────────────────────────────────────
@@ -48,6 +59,7 @@ const BlackJack = (() => {
         socket.on('hand_deleted', onHandDeleted);
         socket.on('player_kicked', onPlayerKicked);
         socket.on('player_renamed', onPlayerRenamed);
+        socket.on('shoe_updated', onShoeUpdated);
 
         // Set default target
         if (config.role === 'teacher') {
@@ -76,6 +88,11 @@ const BlackJack = (() => {
                     }
                 }
             } catch (e) { /* ignore parse errors */ }
+
+            // Apply UX color grouping
+            if (token && el.id !== 'dealer-target' && !el.dataset.isDealer) {
+                el.style.borderLeft = `4px solid ${getPlayerColor(token)}`;
+            }
         });
 
         initUniversalUI();
@@ -83,9 +100,26 @@ const BlackJack = (() => {
         // Show initial preview of the default target
         updateActionPanelPreview();
 
+        // ── Initialize Deck Explorer (Teacher Dashboard) ──────
+        try {
+            const shoeStatsStr = document.getElementById('game-app')?.dataset.shoeStats;
+            if (shoeStatsStr && shoeStatsStr !== '{}') {
+                onShoeUpdated(JSON.parse(shoeStatsStr));
+            }
+        } catch (e) {
+            console.warn("Failed to parse initial shoe stats", e);
+        }
+
         document.getElementById('btn-start-round')?.addEventListener('click', () => {
             if (confirm('คุณต้องการเริ่มรอบใหม่ใช่หรือไม่?\nไพ่บนโต๊ะทั้งหมดจะถูกล้างทิ้ง')) {
                 socket.emit('round_start', { room_code: config.roomCode, session_token: config.token });
+            }
+        });
+
+        // ── Manual Reshuffle ──────────────────────────────────
+        document.getElementById('btn-manual-reshuffle')?.addEventListener('click', () => {
+            if (confirm('คุณแน่ใจหรือไม่ว่าจะสับไพ่ใหม่?\nShoe จะถูกรีเซ็ตและสถิติ True Count ทั้งหมดจะกลับไปเริ่มใหม่')) {
+                socket.emit('manual_reshuffle', { room_code: config.roomCode, session_token: config.token });
             }
         });
     }
@@ -297,15 +331,11 @@ const BlackJack = (() => {
     // PLAYER & HAND DOM MANAGEMENT
     // ───────────────────────────────────────────────
 
-    /**
-     * Re-render all hand rows for a player token.
-     * groups all hands under one player block.
-     */
     function rerenderPlayerHands(token) {
         const section = document.querySelector('.players-section');
         if (!section) return;
 
-        // Remove all existing rows for this player
+        // Remove all existing wrappers and rows for this player
         section.querySelectorAll(`[data-token="${token}"]`).forEach(el => el.remove());
 
         const player = playerRegistry[token];
@@ -315,22 +345,71 @@ const BlackJack = (() => {
             return (player.hands[a]?.hand_index || 0) - (player.hands[b]?.hand_index || 0);
         });
 
-        // If player has no hands yet, show a single empty placeholder
-        if (handIds.length === 0) {
-            const el = buildParticipantEl(token, player.nickname, null, 0, null);
-            section.appendChild(el);
+        // Create Wrapper
+        const wrapper = document.createElement('div');
+        wrapper.className = 'player-wrapper';
+        wrapper.dataset.token = token;
+        wrapper.style.cssText = `border-left: 4px solid ${getPlayerColor(token)}; background: var(--bg-hover); padding: 8px; border-radius: 6px; margin-bottom: 4px; border: 1px solid var(--border); transition: all 0.2s;`;
+
+        // Create Header
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; padding-bottom:4px; border-bottom: 1px solid rgba(255,255,255,0.05);';
+
+        let badges = '';
+        if (config.token === token) badges += `<span class="badge badge--you" style="font-size:0.65rem;padding:2px 6px;margin-left:4px;">คุณ</span>`;
+        if (player.role === 'teacher') badges += `<span class="badge badge--teacher" style="font-size:0.65rem;padding:2px 6px;margin-left:4px;">อาจารย์</span>`;
+
+        header.innerHTML = `
+            <div class="participant-label" style="font-size:0.85rem; font-weight:bold; display:flex; align-items:center;">
+                ${player.nickname} ${badges}
+            </div>
+            <div class="edit-action" style="display:${editMode ? 'flex' : 'none'}; gap:4px; align-items:center;">
+                <button class="btn-kick" data-token="${token}" data-name="${player.nickname}" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:0.8rem;padding:2px 4px;" title="ลบผู้เล่น">🚫</button>
+                <button class="btn-rename" data-token="${token}" data-name="${player.nickname}" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.75rem;padding:2px 4px;" title="เปลี่ยนชื่อ">✏️</button>
+            </div>
+        `;
+        wrapper.appendChild(header);
+
+        // Bind header edit actions
+        header.querySelector('.btn-kick')?.addEventListener('click', (e) => {
+            if (confirm(`ลบ "${player.nickname}" ออกจากห้อง?`)) {
+                socket.emit('kick_player', { room_code: config.roomCode, session_token: config.token, target_token: token });
+            }
+        });
+        header.querySelector('.btn-rename')?.addEventListener('click', (e) => {
+            const newName = prompt('ชื่อใหม่:', player.nickname);
+            if (newName && newName.trim()) {
+                socket.emit('rename_player', {
+                    room_code: config.roomCode, session_token: config.token,
+                    target_token: token, nickname: newName.trim(),
+                });
+            }
+        });
+
+        // Create Hands Container
+        const handsContainer = document.createElement('div');
+        handsContainer.className = 'hands-container';
+        handsContainer.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
+
+        const totalHands = handIds.length;
+
+        if (totalHands === 0) {
+            handsContainer.appendChild(buildHandEl(token, player.nickname, null, 0, null, true));
         } else {
-            handIds.forEach((handId, i) => {
+            handIds.forEach((handId) => {
                 const hand = player.hands[handId];
-                const el = buildParticipantEl(token, player.nickname, hand, hand.hand_index, handId);
-                section.appendChild(el);
+                handsContainer.appendChild(buildHandEl(token, player.nickname, hand, hand.hand_index, handId, totalHands <= 1));
             });
         }
 
+        wrapper.appendChild(handsContainer);
+        section.appendChild(wrapper);
+
         bindSelectableTargets();
+        applyEditMode(); // Re-apply edit mode visibility to new elements
     }
 
-    function buildParticipantEl(token, nickname, hand, handIndex, handId) {
+    function buildHandEl(token, nickname, hand, handIndex, handId, isLastHand) {
         const el = document.createElement('div');
         el.className = 'participant selectable-target';
         el.dataset.token = token;
@@ -339,61 +418,62 @@ const BlackJack = (() => {
         el.dataset.handJson = hand ? JSON.stringify(hand) : 'null';
         if (handId) el.dataset.handId = handId;
 
-        const handBadge = handIndex > 0
-            ? `<span style="font-size:0.7rem;color:var(--text-muted);margin-left:2px;">มือ ${handIndex + 1}</span>` : '';
+        const handBadge = handIndex > 0 ? `<span style="font-size:0.75rem;color:var(--text-muted);margin-right:4px;">มือ ${handIndex + 1}</span>` : '';
 
-        // Count total hands for this player to know if we should show kick vs delete-hand
-        const totalHands = Object.keys(playerRegistry[token]?.hands || {}).length;
-        const isLastHand = totalHands <= 1;
+        el.style.cssText = 'background: rgba(255,255,255,0.03); padding: 6px; border-radius: 4px; border: 1px solid transparent; transition: all 0.2s; cursor: pointer;';
 
-        el.style.cssText = 'background: var(--bg-hover); padding: 8px; border-radius: 6px; border: 2px solid transparent; transition: all 0.2s; cursor: pointer;';
-        el.innerHTML = `
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-                <div class="participant-label" style="font-size: 0.85rem; display:flex; align-items:center; gap:4px;">
-                    ${nickname} ${handBadge}
-                </div>
-                <div class="edit-action" style="display:${editMode ? '' : 'none'}; gap:4px; align-items:center;">
-                    ${handId ? `<button class="btn-del-hand" data-hand-id="${handId}" data-is-last="${isLastHand}" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:0.8rem;padding:2px 4px;" title="${isLastHand ? 'ลบผู้เล่น' : 'ลบมือนี้'}">${isLastHand ? '🚫' : '✕'}</button>` : ''}
-                    <button class="btn-rename" data-token="${token}" data-name="${nickname}" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.75rem;padding:2px 4px;" title="เปลี่ยนชื่อ">✏️</button>
-                </div>
-            </div>
-            <div class="hand-display" style="gap: 4px;">
-                ${renderHandHTML(hand)}
+        if (!hand) {
+            el.innerHTML = `<div class="hand-empty" style="font-size: 0.8rem; padding: 4px; text-align: left;">รอบันทึก...</div>`;
+            return el;
+        }
+
+        const scoreHTML = `
+            <div class="hand-score" style="font-size: 0.9rem;">
+                ${handBadge}
+                ⭐ ${hand.score}
+                ${hand.is_busted ? '<span class="badge badge--bust" style="font-size: 0.6rem; padding: 2px 4px;">💥</span>' : ''}
+                ${hand.is_blackjack ? '<span class="badge badge--bj" style="font-size: 0.6rem; padding: 2px 4px;">🌟</span>' : ''}
+                <span class="edit-action" style="display:${editMode ? 'inline' : 'none'}; float:right;">
+                    <button class="btn-del-hand" data-hand-id="${handId}" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:0.8rem;padding:0 4px;" title="ลบมือนี้">✕</button>
+                </span>
             </div>
         `;
 
-        // Wire up inline buttons
+        el.innerHTML = `
+            <div class="hand-display" style="gap: 4px; margin-bottom: 2px;">
+                ${scoreHTML}
+                <div class="cards-row" style="flex-wrap: wrap; justify-content: flex-start; gap: 4px;">
+                    ${renderHandCardsOnly(hand)}
+                </div>
+            </div>
+        `;
+
         el.querySelector('.btn-del-hand')?.addEventListener('click', (e) => {
             e.stopPropagation();
-            const hid = e.currentTarget.dataset.handId;
-            const isLast = e.currentTarget.dataset.isLast === 'true';
-            if (isLast) {
-                if (confirm(`ลบ "${nickname}" ออกจากห้อง? (มือสุดท้าย)`)) {
-                    socket.emit('kick_player', { room_code: config.roomCode, session_token: config.token, target_token: token });
-                }
+            if (isLastHand) {
+                if (confirm(`นี่คือมือสุดท้ายของ "${nickname}" คุณต้องลบผู้เล่นออกที่ไอคอน 🚫 ด้านบนแทน`)) return;
             } else {
                 if (confirm('ยืนยันลบมือนี้?')) {
-                    socket.emit('delete_hand', { room_code: config.roomCode, session_token: config.token, hand_id: hid });
+                    socket.emit('delete_hand', { room_code: config.roomCode, session_token: config.token, hand_id: handId });
                 }
-            }
-        });
-
-        el.querySelector('.btn-rename')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const tkn = e.currentTarget.dataset.token;
-            const nm = e.currentTarget.dataset.name;
-            const newName = prompt('ชื่อใหม่:', nm);
-            if (newName && newName.trim()) {
-                socket.emit('rename_player', {
-                    room_code: config.roomCode,
-                    session_token: config.token,
-                    target_token: tkn,
-                    nickname: newName.trim(),
-                });
             }
         });
 
         return el;
+    }
+
+    function renderHandCardsOnly(hand) {
+        if (!hand || !hand.cards || hand.cards.length === 0) return '';
+        return hand.cards.map(c => {
+            const isRed = (c.suit === 'hearts' || c.suit === 'diamonds');
+            const suitSym = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' }[c.suit] || '';
+            return `
+                <div class="playing-card playing-card--${isRed ? 'red' : 'black'}" style="width: 32px; height: 46px; padding: 2px;">
+                    <span class="card-rank" style="font-size: 0.85rem;">${c.rank}</span>
+                    <span class="card-suit" style="font-size: 0.85rem;">${suitSym}</span>
+                </div>
+            `;
+        }).join('');
     }
 
     // ───────────────────────────────────────────────
@@ -433,15 +513,15 @@ const BlackJack = (() => {
     // SOCKET EVENT HANDLERS
     // ───────────────────────────────────────────────
     function triggerAdviceIfPlayer() {
-        // Request advice for whoever is currently selected (skip dealer, skip empty hands)
+        // Request advice for whoever is currently selected (skip dealer)
         if (currentTarget.isDealer) return;
         if (!currentTarget.token) return;
-        if (!currentTarget.hand || !currentTarget.hand.cards || currentTarget.hand.cards.length === 0) return;
 
         socket.emit('advice_request', {
             room_code: config.roomCode,
             session_token: config.token,
             target_token: currentTarget.token,
+            target_hand_id: currentTarget.handId,
         });
     }
 
@@ -643,6 +723,41 @@ const BlackJack = (() => {
     }
 
     function onRoundEnded(data) { showToast('■ จบรอบแล้ว', 'info'); }
+
+    // ───────────────────────────────────────────────
+    // MATHEMATICIAN DASHBOARD LOGIC
+    // ───────────────────────────────────────────────
+    function onShoeUpdated(stats) {
+        if (!stats) return;
+
+        // Only update if the elements exist (Teacher view)
+        const elTotal = document.getElementById('dash-cards-rem');
+        if (!elTotal) return;
+
+        // Base metrics
+        elTotal.textContent = stats.cards_remaining;
+        document.getElementById('dash-decks-rem').textContent = stats.decks_remaining;
+        document.getElementById('dash-true-count').textContent = stats.true_count;
+        document.getElementById('dash-running-count').textContent = stats.running_count;
+
+        // Card breakdown
+        const countA = stats.aces || 0;
+        const countH = stats.high || 0;
+        const countN = stats.neutral || 0;
+        const countL = stats.low || 0;
+
+        document.getElementById('dash-count-a').textContent = countA;
+        document.getElementById('dash-count-h').textContent = countH;
+        document.getElementById('dash-count-n').textContent = countN;
+        document.getElementById('dash-count-l').textContent = countL;
+
+        // Probabilities
+        if (stats.cards_remaining > 0) {
+            document.getElementById('dash-ten-prob').textContent = (stats.ten_probability || 0.0) + '%';
+        } else {
+            document.getElementById('dash-ten-prob').textContent = '0.0%';
+        }
+    }
 
     // ───────────────────────────────────────────────
     // HTML RENDERING HELPERS
